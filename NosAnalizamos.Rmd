@@ -131,7 +131,7 @@ cova_pearson <- cov(asignaturas, use = "complete.obs")
 # Matriz de correlación (Pearson)
 cor_pearson <- cor(asignaturas, method = "pearson", use = "complete.obs")
 
-# Matriz de correlación (Spearman)
+# Matriz de correlación (Spearman), Spearman no tiene covarianza.
 cor_spearman <- cor(asignaturas, method = "spearman", use = "complete.obs")
 
 #PARES CON MAYOR CORRELACIÓN PEARSON aunque se ve a simple vista porque la tabla es pequeña
@@ -166,5 +166,58 @@ ggplot(asignaturas_long, aes(x = asignatura, y = nota, fill = asignatura)) +
   ) +
   theme_minimal() +
   theme(legend.position = "none")
+
+sex <- datos%>% select(Sex)
+#o mutate(sex = datos$Sex)
+
+asignaturas_sex <- asignaturas %>%
+  mutate(sex = datos$Sex) %>%   # usa el vector directamente
+  pivot_longer(
+    cols = names(asignaturas),
+    names_to = "asignatura",
+    values_to = "nota"
+  )
+
+
+ggplot(asignaturas_sex, aes(x = asignatura, y = nota, fill = sex)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución de calificaciones por asignatura y sexo",
+    x = "Asignatura",
+    y = "Nota"
+  ) +
+  theme_minimal()
+
+
+
+ggplot(asignaturas_long, aes(x = asignatura, y = nota, fill = asignatura)) +
+  stat_summary(fun = mean, geom = "bar", alpha = 0.8) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
+  labs(
+    title = "Media de calificaciones por asignatura",
+    x = "Asignatura",
+    y = "Media"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+Selecciona los alumnos que tengan calificaciones en todas las asignaturas y represéntalas gráficamente.  En el eje X aparecerá el usuario del alumno (girado 90º) y en el eje Y la calificación numérica con un color distinto para cada asignatura. Se mostrará un diagrama de líneas, que una las calificaciones de una misma asignatura para todos los alumnos así como un punto, por asignatura (del mismo color que las líneas), para cada asignatura y alumno
+
+```{r}
+asignatura_alumno <- asignaturas %>% mutate( usuario = datos$Id ) %>% drop_na() %>%
+  select(usuario, everything()) %>% pivot_longer(
+        cols = -usuario, names_to = "asignaturas",
+        values_to = "notas") #lo tenemos legible para ggplot.
+
+ggplot(asignatura_alumno, aes(x = factor(usuario), #para el examen revisar los nombres de las columnas para printear bien y evitar errores.
+                              y = notas, 
+                              color = asignaturas, 
+                              group = asignaturas)) +
+  geom_line(alpha = 0.6) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+
 ```
 
