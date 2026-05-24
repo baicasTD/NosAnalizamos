@@ -1,18 +1,14 @@
 ---
 title: "NosAnalizamos"
-author: "Francisco_Javier_Bailach_Castilla"
+author: "FJavierBailachCastilla"
 date: "`r Sys.Date()`"
-output: html_document
-  html_document:
-    echo: yes
-    number_sections: no
-    theme: lumen
-    toc: yes
-  pdf_document:
-    toc: yes
-    toc_depth: 3
-    number_sections: no
+output:
+  bookdown::pdf_document2:
+    latex_engine: xelatex
+  bookdown::html_document2:
+    df_print: paged
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -89,11 +85,13 @@ copia <- copia %>%
       TRUE ~ NA_real_                                   # resto → NA
     )
   }))
+# PREGUNTAS A RESPONDER
 
 ```{r pregunta_5}
 asignaturas <- datos %>% select(c(13:17)) #columnas de asignaturas
 asignaturas <- asignaturas %>% mutate(across(everything(), as.numeric)) %>% mutate(across(contains("NC"), ~ 3)) #SUSTITUIMOS NC POR 3
 asignaturas <- asignaturas %>% mutate(across(where(is.numeric), ~ round(.x, 2))) #solo dos decimales.
+
 datos <- datos %>%
   select(-c(13:17)) %>%              # quitamos columnas antiguas
   add_column(                        # añadimos las nuevas en su posición
@@ -101,10 +99,11 @@ datos <- datos %>%
     .before = 13
   )
 
+save(asignaturas, file = "data/Notas.RData")
 ```
 
 
-TABLA DE ESTADÍSTICOS
+## TABLA DE ESTADÍSTICOS
 
 ```{r estadisticos}
 
@@ -131,7 +130,7 @@ ggpairs(tabla)
 ggpairs(asignaturas)
 ```
 
-MATRICES DE COVARIANZA , CORRELACIÓN. PEARSON Y SPEARMAN
+## MATRICES DE COVARIANZA , CORRELACIÓN. PEARSON Y SPEARMAN
 
 ```{r}
 # Matriz de covarianza (Pearson)
@@ -155,7 +154,7 @@ paste(rownames(cor_pearson)[idx[1]], "-", colnames(cor_pearson)[idx[2]])
 #VISUALIZACIÓN COR
 pairs(asignaturas)
 ```
-REPRESENTACIÓN GRÁFICA USANDO BOXPLOT DE CADA ASIGNATURA
+## REPRESENTACIÓN GRÁFICA USANDO BOXPLOT DE CADA ASIGNATURA
 
 ```{r} 
 #Para poder representar elvalor de cada asignatura.
@@ -229,7 +228,9 @@ ggplot(asignatura_alumno, aes(x = factor(usuario), #para el examen revisar los n
   theme(axis.text.x = element_text(angle = 90))
 
 ```
-```{r carga_de_datos_act13}
+## LIMPIEZA DATOS 2026
+
+```{r carga_de_datos_act13, echo = FALSE}
 library(readr)
 datos <- read_delim("data/NosAutoanalizamos2026 - NosAutoanalizamos (1).tsv", 
     delim = "\t", escape_double = FALSE, 
