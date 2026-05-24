@@ -19,26 +19,37 @@ When you click the **Knit** button a document will be generated that includes bo
 library(pracma)
 library(readr)
 library(tidyverse)
+library(ggplot2)
 ```
 
 ## CARGA DE DATOS
 
 You can also embed plots, for example:
 reordenaro por tipo de variable
+
+Resuelto hasta el ejercicio 4. PRIMER COMMIT.
+
+SELECT IMPORTANTES:
 df %>% select(where(is.numeric), where(is.character))
 df %>% select(order(colnames(df)))
 
 
+FILTER IMPORTANTES:
+df <- df %>% filter(variable != "A") valor concreto
+df <- df %>% filter(!is.na(peso)) con valores NA en una columna
+df <- df %>% filter(!(sexo == "M" & altura < 170)) con varias condiciones
 
-```{r carga_de_datos, echo=FALSE}
+df <- df[-5, ] eliminar solo la fila 5.
+df <- df[-c(1:10), ] eliminar filas de la 1 a la 10
+
+
+```{r carga_de_datos_pregunta1_a5, echo=FALSE}
 datos <- read_delim("data/NosAutoanalizamos2022 - Hoja1.tsv", 
     delim = "\t", escape_double = FALSE, 
-    col_types = cols(Fecha = col_date(format = "%dd/%mm/%YYYY"), 
-        ALG = col_double(), ANM = col_double(), 
-        FP = col_double(), DCS = col_double(), 
-        MD = col_double()), trim_ws = TRUE, 
-    skip = 25)
-#View(NosAutoanalizamos2022_Hoja1), tendré que retirar la col 1 más adelante
+    col_types = cols(`FechaNac(DD-MM-YYY)` = col_date(format = "%d-%m-%Y")), 
+    trim_ws = TRUE, skip = 25)
+
+  #View(NosAutoanalizamos2022_Hoja1), tendré que retirar la col 1 más adelante
 #Limpieza
 names(datos)
 datos <- datos %>% select(everything(), - ...1)#elimino columna extraña 
@@ -51,8 +62,109 @@ datos <- datos %>% select(2, everything()) #reordeno id primero
 #copia <- datos %>% filter((Id != "martsobm"))
 
 datos <- datos %>% filter((Id != "martsobm")) #elimino fila con datos martsobm
+```
 
+Selecciona las columnas  con las calificaciones y adecúalas para que al transformar a tipo numérico los valores sean correctos (recuerda que el separador decimal es el punto). Si alguna calificación es NC se sustituirá por 3. Cualquier otro valor no conocido se sustituirá por NA (por ejemplo "6 y pico", no es un valor conocido).
+
+
+copia <- copia %>%
+  mutate(across(contains("Nota"), ~ {
+    
+    x <- .x |> 
+      trimws() |>                     # quitar espacios
+      gsub(",", ".", x)               # coma → punto
+    
+    case_when(
+      grepl("^[0-9]+(\\.[0-9]+)?$", x) ~ as.double(x),  # número válido
+      x == "NC" ~ 3,                                   # NC → 3
+      TRUE ~ NA_real_                                   # resto → NA
+    )
+  }))
+
+```{r pregunta_5}
+asignaturas <- datos %>% select(c(13:17)) #columnas de asignaturas
+asignaturas <- asignaturas %>% mutate(across(everything(), as.numeric)) %>% mutate(across(contains("NC"), ~ 3)) #SUSTITUIMOS NC POR 3
+asignaturas <- asignaturas %>% mutate(across(where(is.numeric), ~ round(.x, 2))) #solo dos decimales.
+datos <- datos %>%
+  select(-c(13:17)) %>%              # quitamos columnas antiguas
+  add_column(                        # añadimos las nuevas en su posición
+    !!!asignaturas,                  #desempaquetamos 1 a 1 cada columna
+    .before = 13
+  )
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+TABLA DE ESTADÍSTICOS
+
+```{r estadisticos}
+
+funs_stats <- list(
+  min      = ~ min(.x, na.rm = TRUE),
+  p25      = ~ quantile(.x, 0.25, na.rm = TRUE),
+  median   = ~ median(.x, na.rm = TRUE),
+  mean     = ~ mean(.x, na.rm = TRUE),
+  sd       = ~ sd(.x, na.rm = TRUE),
+  p75      = ~ quantile(.x, 0.75, na.rm = TRUE),
+  max      = ~ max(.x, na.rm = TRUE)
+)
+
+tabla <- asignaturas %>% summarise(across(everything(), funs_stats)) %>%
+  pivot_longer(everything(), names_to = c("asignatura", "estadístico"), 
+               names_sep = "_", values_to = "valor") %>% 
+    pivot_wider(names_from = estadístico, values_from = valor)
+
+tabla <- tabla %>%
+  mutate(across(-asignatura, ~ round(.x, 2))) 
+
+library(GGally)
+ggpairs(tabla)
+ggpairs(asignaturas)
+```
+
+MATRICES DE COVARIANZA , CORRELACIÓN. PEARSON Y SPEARMAN
+
+```{r}
+# Matriz de covarianza (Pearson)
+cova_pearson <- cov(asignaturas, use = "complete.obs")
+
+# Matriz de correlación (Pearson)
+cor_pearson <- cor(asignaturas, method = "pearson", use = "complete.obs")
+
+# Matriz de correlación (Spearman)
+cor_spearman <- cor(asignaturas, method = "spearman", use = "complete.obs")
+
+#PARES CON MAYOR CORRELACIÓN PEARSON aunque se ve a simple vista porque la tabla es pequeña
+which(abs(cor_pearson) == max(abs(cor_pearson[upper.tri(cor_pearson)])), arr.ind = TRUE)
+#PARES CON MAYOR CORRELACIÓN SPEARMAN
+which(abs(cor_spearman) == max(abs(cor_spearman[upper.tri(cor_spearman)])), arr.ind = TRUE)
+
+#LOS NOMBRES DE LOS TOP CORRELACIÓN
+idx <- which(abs(cor_pearson) == max(abs(cor_pearson[upper.tri(cor_pearson)])), arr.ind = TRUE)
+paste(rownames(cor_pearson)[idx[1]], "-", colnames(cor_pearson)[idx[2]])
+
+#VISUALIZACIÓN COR
+pairs(asignaturas)
+```
+REPRESENTACIÓN GRÁFICA USANDO BOXPLOT DE CADA ASIGNATURA
+
+```{r} 
+#Para poder representar elvalor de cada asignatura.
+asignaturas_long <- asignaturas %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "asignatura",
+    values_to = "nota"
+  )
+
+ggplot(asignaturas_long, aes(x = asignatura, y = nota, fill = asignatura)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución de calificaciones por asignatura",
+    x = "Asignatura",
+    y = "Calificación"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
